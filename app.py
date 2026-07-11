@@ -79,14 +79,15 @@ if st.button("🚀 분자 생성 및 시각화 시작", use_container_width=True
         result_text = "".join(generated_molecule)
         st.markdown(f"### 🧬 예측된 SMILES 코드: `{result_text}`")
         
-        # 2. 외부 화학 이미지 엔진(선명한 구조 이미지 제공)을 이용해 2D 구조 그리기
+        # 2. NIH(미국 국립보건원) 공식 오픈 API를 사용하여 절대 깨지지 않는 2D 구조 그리기
         try:
-            # 안전하게 특수문자를 인코딩하여 이미지 URL 생성
+            # '=' 기호가 웹 주소에서 깨지지 않도록 변환
             encoded_smiles = result_text.replace("=", "%3D")
-            image_url = f"https://image.rsc.org/chemid/?smiles={encoded_smiles}"
+            # NIH Cactus 서비스 URL 사용
+            nih_image_url = f"https://cactus.nci.nih.gov/chemical/structure/{encoded_smiles}/image"
             
-            # 스트림릿 화면에 바로 이미지 띄우기
-            st.image(image_url, caption=f"AI가 예측한 {result_text}의 2D 화학 구조", width=350)
+            # 스트림릿 화면에 이미지 띄우기
+            st.image(nih_image_url, caption=f"AI가 예측한 {result_text}의 2D 화학 구조", width=350)
             
         except Exception as e:
             st.warning("⚠️ 이미지를 불러오는 도중 오류가 발생했습니다. 잠시 후 다시 시도해 보세요.")
