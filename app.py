@@ -2,10 +2,11 @@ import streamlit as st
 import torch
 import torch.nn as nn
 import random
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="분자 구조 AI 시뮬레이터", layout="centered")
 st.title("🔬 과학적 결합 규칙 기반 AI 시뮬레이터")
-st.write("LSTM의 상태 제어 개념을 원자의 결합선(Valence) 추적 알고리즘과 결합하여 진짜 성립 가능한 분자를 만듭니다.")
+st.write("외부 엔진 없이 내부 그래픽 라이브러리로 모든 원소를 깨짐 없이 100% 시각화합니다.")
 
 VOCAB = ['<pad>', 'C', 'O', 'N', '=', '<eos>']
 char_to_idx = {char: idx for idx, char in enumerate(VOCAB)}
@@ -32,6 +33,49 @@ model.eval()
 st.sidebar.header("⚙️ 시뮬레이션 설정")
 tf_ratio = st.sidebar.slider("교사 강요 비율", min_value=0.0, max_value=1.0, value=0.5, step=0.1)
 start_element = st.selectbox("시작할 원소를 선택하세요:", ['C', 'O', 'N'])
+
+# 🎨 내장 그래픽 라이브러리로 분자를 직접 그리는 함수
+def draw_molecule_custom(molecule_list):
+    fig, ax = plt.subplots(figsize=(6, 2))
+    
+    # 원소별 색상 정의 (화학 표준 색상 반영)
+    colors = {'C': '#222222', 'O': '#FF4D4D', 'N': '#3333FF'}
+    
+    x = 0.0
+    y = 0.0
+    
+    # 텍스트에서 결합선과 원소를 분리하여 순서대로 그리기
+    render_elements = []
+    i = 0
+    while i < len(molecule_list):
+        if molecule_list[i] == '=':
+            render_elements.append('=')
+        else:
+            render_elements.append(molecule_list[i])
+        i += 1
+
+    # 그리기 알고리즘
+    for idx, elem in enumerate(render_elements):
+        if elem == '=':
+            # 이중 결합 선 2개 그리기
+            ax.plot([x - 0.3, x + 0.3], [y + 0.05, y + 0.05], color='#555555', linewidth=3)
+            ax.plot([x - 0.3, x + 0.3], [y - 0.05, y - 0.05], color='#555555', linewidth=3)
+            x += 0.5
+        else:
+            # 직전이 원소였고 이중결합이 아니었다면 단일 결합선 먼저 그리기
+            if idx > 0 and render_elements[idx-1] != '=':
+                ax.plot([x - 0.7, x - 0.3], [y, y], color='#888888', linewidth=2)
+            
+            # 원소 글자 박기
+            ax.text(x, y, elem, fontsize=24, fontweight='bold', 
+                    color=colors.get(elem, '#000000'), ha='center', va='center',
+                    bbox=dict(facecolor='white', edgecolor='none', boxstyle='round,pad=0.2'))
+            x += 1.0
+
+    ax.set_xlim(-0.5, x - 0.5)
+    ax.set_ylim(-0.5, 0.5)
+    ax.axis('off') # 격자나 축 숨기기
+    st.pyplot(fig)
 
 if st.button("🚀 과학적 분자 생성 시작", use_container_width=True):
     with torch.no_grad():
@@ -91,14 +135,10 @@ if st.button("🚀 과학적 분자 생성 시작", use_container_width=True):
         result_text = "".join(generated_molecule)
         if result_text.endswith('='):
             result_text = result_text[:-1]
+            generated_molecule.pop()
             
         st.success("✨ 과학적 분자 구조 생성 완료!")
         st.markdown(f"### 🧬 예측된 SMILES 코드: `{result_text}`")
         
-        # 💡 탄소(C) 글자를 생략하지 않고 모두 보여주는 PubChem 이미지 API로 교체!
-        try:
-            encoded_smiles = result_text.replace("=", "%3D")
-            pubchem_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{encoded_smiles}/PNG"
-            st.image(pubchem_url, caption=f"모든 원소 기호가 표시된 {result_text}의 구조", width=350)
-        except:
-            st.warning("⚠️ 구조 이미지 엔진 오류")
+        # 🎨 우리가 직접 만든 깨짐 없는 시각화 함수 실행!
+        draw_molecule_custom(generated_molecule)
