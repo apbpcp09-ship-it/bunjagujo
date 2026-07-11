@@ -2,12 +2,10 @@ import streamlit as st
 import torch
 import torch.nn as nn
 import random
-from rdkit import Chem
-from rdkit.Chem import Draw
 
 st.set_page_config(page_title="분자 구조 AI 시뮬레이터", layout="centered")
 st.title("🧪 분자 구조 예측 & 시각화 AI")
-st.write("LSTM의 기억 창고로 구조를 예측하고, RDKit으로 실제 분자를 그립니다.")
+st.write("LSTM의 기억 창고로 구조를 예측하고, 분자 이미지를 실시간으로 시각화합니다.")
 
 VOCAB = ['<pad>', 'C', 'O', 'N', '=', '<eos>']
 char_to_idx = {char: idx for idx, char in enumerate(VOCAB)}
@@ -81,16 +79,14 @@ if st.button("🚀 분자 생성 및 시각화 시작", use_container_width=True
         result_text = "".join(generated_molecule)
         st.markdown(f"### 🧬 예측된 SMILES 코드: `{result_text}`")
         
-        # 2. 화학 구조 실제로 그리기 (RDKit 연동)
+        # 2. 외부 화학 이미지 엔진(선명한 구조 이미지 제공)을 이용해 2D 구조 그리기
         try:
-            # 문자열을 실제 화학 분자 객체로 변환
-            mol = Chem.MolFromSmiles(result_text)
-            if mol:
-                # 분자 구조를 2D 이미지로 생성
-                img = Draw.MolToImage(mol, size=(300, 300))
-                # 스트림릿 화면에 이미지 띄우기
-                st.image(img, caption=f"AI가 예측한 {result_text}의 2D 구조", use_container_width=False)
-            else:
-                st.warning("⚠️ 예측된 문자열이 화학적 결합 규칙에 완벽히 맞지 않아 그림을 그릴 수 없습니다. 다른 원소로 다시 시도해 보세요!")
+            # 안전하게 특수문자를 인코딩하여 이미지 URL 생성
+            encoded_smiles = result_text.replace("=", "%3D")
+            image_url = f"https://image.rsc.org/chemid/?smiles={encoded_smiles}"
+            
+            # 스트림릿 화면에 바로 이미지 띄우기
+            st.image(image_url, caption=f"AI가 예측한 {result_text}의 2D 화학 구조", width=350)
+            
         except Exception as e:
-            st.error("그림 생성 중 오류가 발생했습니다.")
+            st.warning("⚠️ 이미지를 불러오는 도중 오류가 발생했습니다. 잠시 후 다시 시도해 보세요.")
