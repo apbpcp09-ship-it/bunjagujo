@@ -4,16 +4,16 @@ import torch.nn as nn
 import random
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="옥텟 규칙 준수 AI 시뮬레이터", layout="centered")
-st.title("🧪 옥텟 규칙(Octet Rule) 준수 AI 시뮬레이터")
-st.write("LSTM 상태 제어에 실제 '옥텟 규칙 전자쌍 계산기'를 결합하여 화학적으로 100% 안정한 분자만 생성합니다.")
+st.set_page_config(page_title="옥텟 규칙 & 수소 시각화 AI", layout="centered")
+st.title("🧪 옥텟 규칙 준수 & 수소 시각화 AI")
+st.write("생략되던 수소(H) 원자까지 화학 결합 법칙에 맞게 계산하여 화면에 모두 표시합니다.")
 
 VOCAB = ['<pad>', 'C', 'O', 'N', '=', '<eos>']
 char_to_idx = {char: idx for idx, char in enumerate(VOCAB)}
 idx_to_char = {idx: char for idx, char in enumerate(VOCAB)}
 
-# 원자가 전자 수 (옥텟 규칙을 만족하기 위해 필요한 전자의 기반)
-VALENCE_ELECTRONS = {'C': 4, 'O': 6, 'N': 5}
+# 원소별 최대 결합선 (팔 개수)
+MAX_VALENCE = {'C': 4, 'O': 2, 'N': 3}
 
 class MolecularLSTM(nn.Module):
     def __init__(self, vocab_size=6, embedding_dim=8, hidden_dim=16):
@@ -35,48 +35,94 @@ st.sidebar.header("⚙️ 시뮬레이션 설정")
 tf_ratio = st.sidebar.slider("교사 강요 비율", min_value=0.0, max_value=1.0, value=0.5, step=0.1)
 start_element = st.selectbox("시작할 원소를 선택하세요:", ['C', 'O', 'N'])
 
-# 🎨 원소와 결합선을 선명하게 그려주는 내장 그래픽 함수
-def draw_molecule_custom(molecule_list):
-    fig, ax = plt.subplots(figsize=(6, 2))
-    colors = {'C': '#222222', 'O': '#FF4D4D', 'N': '#3333FF'}
+# 🎨 수소(H)를 계산해서 사방으로 그려주는 고성능 시각화 함수
+def draw_molecule_with_hydrogen(molecule_list):
+    fig, ax = plt.subplots(figsize=(7, 3))
+    colors = {'C': '#222222', 'O': '#FF4D4D', 'N': '#3333FF', 'H': '#00AA00'}
     
-    x, y = 0.0, 0.0
-    render_elements = []
+    # 1. 각 원소가 실제로 쓴 팔의 개수를 계산하기 위한 사전 준비
+    # 실제 원소들만 추출 (이중결합 기호 제외)
+    atoms_only = [elem for elem in molecule_list if elem != '=']
     
-    for elem in molecule_list:
-        render_elements.append(elem)
+    # 각 원소 위치별 소모한 결합선 계산
+    used_bonds = [0] * len(molecule_list)
+    
+    # 결합선 연결 정보 스캔
+    for idx, elem in enumerate(molecule_list):
+        if elem == '=':
+            if idx > 0: used_bonds[idx-1] += 2
+            if idx < len(molecule_list) - 1: used_bonds[idx+1] += 2
+        elif elem in ['C', 'O', 'N']:
+            # 앞 원소와의 단일 결합 체크
+            if idx > 0 and molecule_list[idx-1] != '=':
+                used_bonds[idx] += 1
+                used_bonds[idx-1] += 1
 
-    for idx, elem in enumerate(render_elements):
+    x, y = 0.5, 0.0
+    atom_positions = {} # 원소들의 x 좌표 저장용
+    atom_idx = 0
+
+    # 메인 뼈대 그리기
+    for idx, elem in enumerate(molecule_list):
         if elem == '=':
             ax.plot([x - 0.3, x + 0.3], [y + 0.06, y + 0.06], color='#444444', linewidth=3)
             ax.plot([x - 0.3, x + 0.3], [y - 0.06, y - 0.06], color='#444444', linewidth=3)
             x += 0.5
         else:
-            if idx > 0 and render_elements[idx-1] != '=':
+            if idx > 0 and molecule_list[idx-1] != '=':
                 ax.plot([x - 0.7, x - 0.3], [y, y], color='#888888', linewidth=2)
             
-            ax.text(x, y, elem, fontsize=24, fontweight='bold', 
+            # 주 원소 텍스트 배치
+            ax.text(x, y, elem, fontsize=22, fontweight='bold', 
                     color=colors.get(elem, '#000000'), ha='center', va='center',
-                    bbox=dict(facecolor='white', edgecolor='none', boxstyle='round,pad=0.2'))
-            x += 1.0
+                    bbox=dict(facecolor='white', edgecolor='none', boxstyle='round,pad=0.1'))
+            
+            atom_positions[atom_idx] = (x, y, elem, used_bonds[idx])
+            atom_idx += 1
+            x += 1.2
 
-    ax.set_xlim(-0.5, x - 0.5)
-    ax.set_ylim(-0.5, 0.5)
+    # 2. 💡 수소(H) 붙이기 알고리즘 작동!
+    for idx, (ax_x, ax_y, elem, u_bond) in atom_positions.items():
+        # 필요한 총 팔 개수에서 이미 뼈대에 써버린 팔 개수를 빼면 필요한 수소 개수가 나옴
+        needed_h = MAX_VALENCE[elem] - u_bond
+        
+        if needed_h <= 0:
+            continue
+            
+        # 수소를 배치할 공간 설정 (위, 아래, 혹은 좌우 끝)
+        h_directions = []
+        if idx == 0:  # 맨 왼쪽 원소면 왼쪽 공간 활용
+            h_directions.append((-0.4, 0))
+        if idx == len(atom_positions) - 1: # 맨 오른쪽 원소면 오른쪽 공간 활용
+            h_directions.append((0.4, 0))
+        
+        # 위, 아래 방향 추가
+        h_directions.extend([(0, 0.45), (0, -0.45)])
+        
+        # 필요한 만큼 수소와 결합선 그리기
+        for h_idx in range(min(needed_h, len(h_directions))):
+            dx, dy = h_directions[h_idx]
+            
+            # 수소 결합선 그리기
+            ax.plot([ax_x, ax_x + dx*0.6], [ax_y, ax_y + dy*0.6], color='#888888', linewidth=1.5)
+            
+            # 수소 'H' 글자 표시
+            ax.text(ax_x + dx, ax_y + dy, 'H', fontsize=14, fontweight='bold',
+                    color=colors['H'], ha='center', va='center')
+
+    ax.set_xlim(-0.2, x - 0.6)
+    ax.set_ylim(-0.8, 0.8)
     ax.axis('off')
     st.pyplot(fig)
 
-if st.button("🚀 옥텟 규칙 기반 분자 생성", use_container_width=True):
+if st.button("🚀 과학적 분자 생성 시작", use_container_width=True):
     with torch.no_grad():
         current_char = start_element
         generated_molecule = [current_char]
         current_input = torch.tensor([[char_to_idx[current_char]]])
         hidden = None
         
-        # 💡 핵심: 옥텟 규칙 달성을 위한 공유 결합 전자 추적
-        # 각 원소가 안정해지기 위해 공유해야 하는 타겟 결합선 수 (8 - 원자가전자수)
         needed_bonds = {'C': 4, 'O': 2, 'N': 3}
-        
-        # 현재 생성 중인 분자의 오픈된 결합 가능 잔여 용량
         current_needed = needed_bonds[start_element]
         last_was_bond = False
         
@@ -88,7 +134,6 @@ if st.button("🚀 옥텟 규칙 기반 분자 생성", use_container_width=True
             predicted_char = None
             predicted_idx = None
             
-            # 옥텟 규칙 잔여 전자가 0이면 완벽히 안정한 분자이므로 즉시 종료 유도
             if current_needed <= 0:
                 predicted_char = '<eos>'
                 break
@@ -96,26 +141,19 @@ if st.button("🚀 옥텟 규칙 기반 분자 생성", use_container_width=True
             for idx in sorted_indices:
                 char = idx_to_char[idx.item()]
                 if char == '<pad>': continue
-                
-                # 종료 조건 처리
                 if char == '<eos>':
-                    if current_needed == 0 or step >= 3:
+                    if current_needed == 0 or step >= 2:
                         predicted_char = char
                         predicted_idx = idx.item()
                         break
                     continue
-                
-                # 이중결합(=) 규칙: 남은 요구 결합선이 최소 2개 이상이어야 함
                 if char == '=':
                     if not last_was_bond and current_needed >= 2:
                         predicted_char = char
                         predicted_idx = idx.item()
                         break
                     continue
-                
-                # 일반 원소 규칙
                 if char in ['C', 'O', 'N']:
-                    # 결합선이 이어질 공간이 남아있을 때만 가능
                     if current_needed > 0:
                         predicted_char = char
                         predicted_idx = idx.item()
@@ -124,34 +162,25 @@ if st.button("🚀 옥텟 규칙 기반 분자 생성", use_container_width=True
             if not predicted_char or predicted_char == '<eos>':
                 break
                 
-            # 결합에 따른 옥텟 규칙 잔여 요구 결합선(Needed Bonds) 변동 계산
             if predicted_char == '=':
                 last_was_bond = True
-                # 이중결합선 자체는 연결 통로이므로 소모 수치 보류
             else:
                 if last_was_bond:
-                    # 이중결합으로 새 원소가 붙으면: 기존 요구량에서 2개 상쇄 + 새 원소의 남은 요구량(최대-2) 합산
                     current_needed = (current_needed - 2) + (needed_bonds[predicted_char] - 2)
                     last_was_bond = False
                 else:
-                    # 단일결합으로 새 원소가 붙으면: 기존 요구량에서 1개 상쇄 + 새 원소의 남은 요구량(최대-1) 합산
                     current_needed = (current_needed - 1) + (needed_bonds[predicted_char] - 1)
             
             generated_molecule.append(predicted_char)
             current_input = torch.tensor([[predicted_idx]])
             current_char = predicted_char
             
-        # 불완전 결합 제거 및 최종 정제
         if generated_molecule[-1] == '=':
             generated_molecule.pop()
         
         result_text = "".join(generated_molecule)
-        
-        st.success("✨ 옥텟 규칙 만족 분자 구조 생성 완료!")
+        st.success("✨ 옥텟 규칙 만족 및 수소 결합 완료!")
         st.markdown(f"### 🧬 예측된 SMILES 코드: `{result_text}`")
         
-        # 선명한 내부 드로잉 엔진 작동
-        draw_molecule_custom(generated_molecule)
-        
-        # 과학적 분석 리포트 제공
-        st.info(f"💡 **옥텟 규칙 분석**: 각 원소 주위의 총 결합선 수가 탄소=4개, 산소=2개, 질소=3개를 이루도록 제어했습니다. 숨겨진 수소(H)를 포함시켰을 때 모든 원소가 최외각 전자 8개(옥텟 규칙)를 완벽하게 만족하는 구조입니다.")
+        # 🎨 수소 표시 드로잉 함수 실행!
+        draw_molecule_with_hydrogen(generated_molecule)
