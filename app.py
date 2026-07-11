@@ -5,7 +5,7 @@ import random
 import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="옥텟 규칙 & 수소 시각화 AI", layout="centered")
-st.title("🧪Al를 통한 분자구조 예측하기")
+st.title("🧪Al를 통한 분자구조 예측하기🔬")
 st.write("생략되던 수소(H) 원자까지 화학 결합 법칙에 맞게 계산하여 화면에 모두 표시합니다.")
 
 VOCAB = ['<pad>', 'C', 'O', 'N', '=', '<eos>']
