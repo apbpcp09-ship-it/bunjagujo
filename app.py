@@ -5,9 +5,9 @@ import torch.nn.functional as F
 import torch.optim as optim
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="탭 분리형 AI 시뮬레이터", layout="centered")
-st.title("🧠 AI 날것의 뇌 & 탭 분리형 시뮬레이터")
-st.write("상단의 탭을 이용해 훈련 창과 생성 창을 깔끔하게 오갈 수 있습니다.")
+st.set_page_config(page_title="AI 분자구조 예측 시뮬레이터", layout="centered")
+st.title("🧠 AI를 통해 분자구조 예측하기 시뮬레이터")
+st.write("상단의 탭을 이용해 훈련 창과 생성 창을 오갈 수 있습니다.")
 
 # ----------------- 1. 사전 정의 및 AI 모델 설정 -----------------
 VOCAB = ['<pad>', 'C', 'O', 'N', '=', '<eos>']
@@ -41,7 +41,7 @@ optimizer = st.session_state.optimizer
 # ----------------- 2. 사이드바 설정 (공통 하이퍼파라미터) -----------------
 st.sidebar.header("🎛️ AI 공통 설정")
 temperature = st.sidebar.slider("🔥 AI 창의성 (Temperature)", min_value=0.0, max_value=1.5, value=0.7, step=0.1)
-use_filter = st.sidebar.checkbox("🛡️ 과학적 안전 필터(옥텟 규칙) 작동", value=True)
+use_filter = st.sidebar.checkbox("🥽옥텟 규칫 작동🥼", value=True)
 
 
 # ----------------- 3. 시각화 엔진 -----------------
@@ -100,11 +100,11 @@ def draw_raw_molecule(molecule_list, has_filter):
 
 
 # ----------------- 4. 탭 분리 레이아웃 생성 -----------------
-tab_train, tab_generate = st.tabs(["🏋️ 다중 분자 훈련창", "🚀 AI 분자 생성창"])
+tab_train, tab_generate = st.tabs(["🏋️ 다중 분자 학습", "🚀 AI 분자 생성"])
 
 # --- [탭 1] 다중 분자 훈련창 ---
 with tab_train:
-    st.subheader("🏋️ AI 뇌 열공 시키기")
+    st.subheader("🏋️ AI 열공 시키기")
     st.write("데이터셋을 입력하고 AI를 반복 학습시키는 공간입니다.")
     
     train_input = st.text_input("정답 분자 데이터셋 입력 (쉼표로 구분):", "C=C, O=C=O, CNN, CON, C=O, N=N, C=N, N=C=N, C=C=O, O=N, O=C=N", key="train_input_key")
@@ -118,7 +118,7 @@ with tab_train:
             model.train()
             loss_fn = nn.CrossEntropyLoss()
             
-            with st.spinner("AI가 수식을 분석하며 뇌세포를 굽는 중..."):
+            with st.spinner("AI가 수식을 분석하며 뇌세포를 패는 중..."):
                 for epoch in range(epochs):
                     epoch_loss = 0
                     for example in molecule_examples:
