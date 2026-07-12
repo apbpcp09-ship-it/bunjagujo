@@ -7,8 +7,9 @@ import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="무조건 시각화 AI 시뮬레이터", layout="centered")
 st.title("🧠 AI 날것의 뇌 & 무조건 시각화 시뮬레이터")
-st.write("이제 필터를 꺼서 AI가 온갖 헛소리를 뱉어도, 에러 없이 그 민낯을 그대로 시각화하여 보여줍니다!")
+st.write("UI 구조를 개선하여 입력창이 항상 노출됩니다. AI 창의성 수치에 따른 극단적인 변화를 자유롭게 관찰하세요!")
 
+# ----------------- 1. 사전 정의 및 AI 모델 설정 -----------------
 VOCAB = ['<pad>', 'C', 'O', 'N', '=', '<eos>']
 char_to_idx = {char: idx for idx, char in enumerate(VOCAB)}
 idx_to_char = {idx: char for idx, char in enumerate(VOCAB)}
@@ -36,22 +37,31 @@ if 'model' not in st.session_state:
 model = st.session_state.model
 optimizer = st.session_state.optimizer
 
+
+# ----------------- 2. 사이드바 제어 및 설정 (상시 노출) -----------------
 st.sidebar.header("🕹️ 모드 선택 및 설정")
 mode = st.sidebar.radio("원하는 작업을 선택하세요:", ["🏋️ 다중 분자 훈련시키기", "🚀 훈련된 AI로 분자 생성"])
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎛️ AI 하이퍼파라미터")
 temperature = st.sidebar.slider("🔥 AI 창의성 (Temperature)", min_value=0.1, max_value=1.5, value=0.7, step=0.1)
 use_filter = st.sidebar.checkbox("🛡️ 과학적 안전 필터(옥텟 규칙) 작동", value=True)
 
-# 💡 이 위치(if문 바깥)로 입력창을 빼내면 어떤 모드에서든 항상 상단에 노출돼!
+
+# ----------------- 3. 메인 화면 UI 요소 배치 (상시 노출로 변경) -----------------
+st.subheader("📝 AI 조작 패널")
+
+# 모드와 상관없이 메인 화면 상단에 항상 상시 노출되는 입력창 세트
 train_input = st.text_input("정답 분자 데이터셋 입력 (쉼표로 구분):", "C=C, O=C=O, CNN, CON, C=O, N=N, C=N, N=C=N, C=C=O, O=N, O=C=N")
+epochs = st.slider("반복 훈련 횟수 (Epochs)", min_value=10, max_value=100, value=50, step=10)
+start_element = st.selectbox("생성 시작할 원소 선택:", ['C', 'O', 'N'])
 
-# --- 1모드: 다중 분자 훈련시키기 ---
-if mode == "🏋️ 다중 분자 훈련시키기":
-    st.subheader("🏋️ 여러 개의 분자 구조 동시에 학습시키기")
-    # 기존에 여기에 있던 train_input 코드는 지우거나 주석 처리!
-    epochs = st.slider("반복 훈련 횟수 (Epochs)", min_value=10, max_value=100, value=50, step=10)
 
+# ----------------- 4. 시각화 엔진 -----------------
+def draw_raw_molecule(molecule_list, has_filter):
+    fig, ax = plt.subplots(figsize=(7, 3))
+    colors = {'C': '#222222', 'O': '#FF4D4D', 'N': '#3333FF', 'H': '#00AA00'}
     
-    # 1. 옥텟 규칙이 켜져 있을 때만 기존 수소 결합 계산 진행
     used_bonds = [0] * len(molecule_list)
     if has_filter:
         for idx, elem in enumerate(molecule_list):
@@ -63,30 +73,25 @@ if mode == "🏋️ 다중 분자 훈련시키기":
                     used_bonds[idx] += 1
                     used_bonds[idx-1] += 1
 
-    # 2. 기본 원소 및 결합선 배치
     x, y = 0.5, 0.0
     atom_positions = {}
     atom_idx = 0
 
     for idx, elem in enumerate(molecule_list):
         if elem == '=':
-            # 이중 결합선 그리기
             ax.plot([x - 0.3, x + 0.3], [y + 0.06, y + 0.06], color='#444444', linewidth=3)
             ax.plot([x - 0.3, x + 0.3], [y - 0.06, y - 0.06], color='#444444', linewidth=3)
             x += 0.5
         else:
-            # 이전 요소가 원소였다면 단일 결합선 연결
             if idx > 0 and molecule_list[idx-1] != '=':
                 ax.plot([x - 0.7, x - 0.3], [y, y], color='#888888', linewidth=2)
             
-            # 원소 문자 출력 (C, O, N 등이 아니어도 텍스트로 안전하게 출력)
             ax.text(x, y, elem, fontsize=22, fontweight='bold', color=colors.get(elem, '#777777'), 
                     ha='center', va='center', bbox=dict(facecolor='white', edgecolor='none', boxstyle='round,pad=0.1'))
             atom_positions[atom_idx] = (x, y, elem, used_bonds[idx])
             atom_idx += 1
             x += 1.2
 
-    # 3. 필터가 켜져 있을 때만 주변에 수소(H)를 주렁주렁 그려줌
     if has_filter:
         for idx, (ax_x, ax_y, elem, u_bond) in atom_positions.items():
             if elem not in MAX_VALENCE: continue
@@ -106,13 +111,13 @@ if mode == "🏋️ 다중 분자 훈련시키기":
     ax.axis('off')
     st.pyplot(fig)
 
-# --- 1모드: 다중 분자 훈련시키기 ---
+
+# ----------------- 5. 실행 로직 분기 -----------------
+st.markdown("---")
+
 if mode == "🏋️ 다중 분자 훈련시키기":
-    st.subheader("🏋️ 여러 개의 분자 구조 동시에 학습시키기")
-    train_input = st.text_input("정답 분자 데이터셋 입력 (쉼표로 구분):", "C=C, O=C=O, CNN, CON, C=O, N=N, C=N, N=C=N, C=C=O, O=N, O=C=N")
-    epochs = st.slider("반복 훈련 횟수 (Epochs)", min_value=10, max_value=100, value=50, step=10)
-    
-    if st.button("🔥 멀티 데이터셋 딥러닝 시작"):
+    st.info("현재 모드: AI에게 분자 데이터셋을 학습시킵니다. 아래 버튼을 누르세요.")
+    if st.button("🔥 멀티 데이터셋 딥러닝 시작", use_container_width=True):
         molecule_examples = [s.strip() for s in train_input.split(",") if s.strip()]
         if not molecule_examples:
             st.error("⚠️ 올바른 분자식을 입력해 주세요.")
@@ -148,11 +153,8 @@ if mode == "🏋️ 다중 분자 훈련시키기":
         ax.set_title("멀티 데이터셋 훈련 오차 감소 현황")
         st.pyplot(fig)
 
-# --- 2모드: 훈련된 AI로 분자 생성 ---
 elif mode == "🚀 훈련된 AI로 분자 생성":
-    st.subheader("🚀 AI 분자 생성 및 민낯 확인")
-    start_element = st.selectbox("시작할 원소를 선택하세요:", ['C', 'O', 'N'])
-    
+    st.info("현재 모드: 학습된 가중치와 선택한 창의성 수치를 바탕으로 새로운 분자를 생성합니다.")
     if st.button("🚀 훈련된 AI 기반 분자 생성", use_container_width=True):
         model.eval()
         with torch.no_grad():
@@ -230,5 +232,5 @@ elif mode == "🚀 훈련된 AI로 분자 생성":
             st.success("✨ 분자 생성 완료!")
             st.markdown(f"### 🧬 AI가 예측한 구조: `{result_text}`")
             
-            # 필터 작동 여부와 무관하게 무조건 시각화 엔진 가동!
+            # 필터 켜짐/꺼짐 상관없이 무조건 시각화 출력!
             draw_raw_molecule(generated_molecule, use_filter)
