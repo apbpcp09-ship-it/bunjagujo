@@ -6,7 +6,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="AI 분자구조 예측 시뮬레이터", layout="centered")
-st.title("🧠 AI를 통해 분자구조 예측하기 시뮬레이터")
+st.title("🧠 AI를 통해 무작위 분자구조 예측하기")
 st.write("상단의 탭을 이용해 훈련 공간과 생성 공간을 오갈 수 있습니다.")
 
 # ----------------- 1. 사전 정의 및 AI 모델 설정 -----------------
