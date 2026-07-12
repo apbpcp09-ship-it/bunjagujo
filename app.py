@@ -3,12 +3,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import random
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="확률적 샘플링 AI 시뮬레이터", layout="centered")
-st.title("🧠 진짜 작동하는 AI 창의성 분자 시뮬레이터")
-st.write("Argmax 방식의 고정 출력을 버리고, 확률적 샘플링(Multinomial)을 주입해 슬라이더 수치에 따라 완벽히 다변화됩니다.")
+st.set_page_config(page_title="필터 해제 모드 AI 시뮬레이터", layout="centered")
+st.title("🧠 AI 날것의 뇌 구경하기 시뮬레이터")
+st.write("옥텟 규칙 필터를 해제하는 스위치가 추가되었습니다. AI 창의성 수치에 따른 극단적인 변화를 직접 체감해 보세요!")
 
 VOCAB = ['<pad>', 'C', 'O', 'N', '=', '<eos>']
 char_to_idx = {char: idx for idx, char in enumerate(VOCAB)}
@@ -40,6 +39,9 @@ optimizer = st.session_state.optimizer
 st.sidebar.header("🕹️ 모드 선택 및 설정")
 mode = st.sidebar.radio("원하는 작업을 선택하세요:", ["🏋️ 다중 분자 훈련시키기", "🚀 훈련된 AI로 분자 생성"])
 temperature = st.sidebar.slider("🔥 AI 창의성 (Temperature)", min_value=0.1, max_value=1.5, value=0.7, step=0.1)
+
+# 💡 오늘의 핵심: 과학적 필터를 켜고 끌 수 있는 치트키 스위치!
+use_filter = st.sidebar.checkbox("🛡️ 과학적 안전 필터(옥텟 규칙) 작동", value=True)
 
 def draw_molecule_with_hydrogen(molecule_list):
     fig, ax = plt.subplots(figsize=(7, 3))
@@ -93,8 +95,6 @@ def draw_molecule_with_hydrogen(molecule_list):
 if mode == "🏋️ 다중 분자 훈련시키기":
     st.subheader("🏋️ 여러 개의 분자 구조 동시에 학습시키기")
     train_input = st.text_input("정답 분자 데이터셋 입력 (쉼표로 구분):", "C=C, O=C=O, CNN, CON, C=O, N=N, C=N, N=C=N, C=C=O, O=N, O=C=N")
-    
-    # 💡 괄호가 완벽히 잘 닫히도록 수정한 부분
     epochs = st.slider("반복 훈련 횟수 (Epochs)", min_value=10, max_value=100, value=50, step=10)
     
     if st.button("🔥 멀티 데이터셋 딥러닝 시작"):
@@ -135,7 +135,7 @@ if mode == "🏋️ 다중 분자 훈련시키기":
 
 # --- 2모드: 훈련된 AI로 분자 생성 ---
 elif mode == "🚀 훈련된 AI로 분자 생성":
-    st.subheader("🚀 균형 잡힌 AI의 분자 생성 확인")
+    st.subheader("🚀 AI 분자 생성 및 민낯 확인")
     start_element = st.selectbox("시작할 원소를 선택하세요:", ['C', 'O', 'N'])
     
     if st.button("🚀 훈련된 AI 기반 분자 생성", use_container_width=True):
@@ -162,31 +162,39 @@ elif mode == "🚀 훈련된 AI로 분자 생성":
                 predicted_char = None
                 predicted_idx = None
                 
-                if current_needed <= 0:
+                if current_needed <= 0 and use_filter:
                     predicted_char = '<eos>'
                     break
-                    
-                for idx in sampled_indices:
-                    char = idx_to_char[idx.item()]
-                    if char == '<pad>': continue
-                    if char == '<eos>':
-                        if current_needed == 0 or step >= 2:
-                            predicted_char = char
-                            predicted_idx = idx.item()
-                            break
-                        continue
-                    if char == '=':
-                        if not last_was_bond and current_needed >= 2:
-                            predicted_char = char
-                            predicted_idx = idx.item()
-                            break
-                        continue
-                    if char in ['C', 'O', 'N']:
-                        if current_needed > 0:
-                            predicted_char = char
-                            predicted_idx = idx.item()
-                            break
                 
+                # 💡 선택 제어 로직
+                if use_filter:
+                    # [필터 작동 모드] 과학적 안전 규칙 적용
+                    for idx in sampled_indices:
+                        char = idx_to_char[idx.item()]
+                        if char == '<pad>': continue
+                        if char == '<eos>':
+                            if current_needed == 0 or step >= 2:
+                                predicted_char = char
+                                predicted_idx = idx.item()
+                                break
+                            continue
+                        if char == '=':
+                            if not last_was_bond and current_needed >= 2:
+                                predicted_char = char
+                                predicted_idx = idx.item()
+                                break
+                            continue
+                        if char in ['C', 'O', 'N']:
+                            if current_needed > 0:
+                                predicted_char = char
+                                predicted_idx = idx.item()
+                                break
+                else:
+                    # [필터 해제 모드] AI의 주사위 결과 1순위를 묻지도 따지지도 않고 즉시 수용!
+                    first_sample = sampled_indices[0].item()
+                    predicted_char = idx_to_char[first_sample]
+                    predicted_idx = first_sample
+
                 if not predicted_char or predicted_char == '<eos>':
                     break
                     
@@ -194,19 +202,25 @@ elif mode == "🚀 훈련된 AI로 분자 생성":
                     last_was_bond = True
                 else:
                     if last_was_bond:
-                        current_needed = (current_needed - 2) + (needed_bonds[predicted_char] - 2)
+                        current_needed = (current_needed - 2) + (needed_bonds.get(predicted_char, 0) - 2)
                         last_was_bond = False
                     else:
-                        current_needed = (current_needed - 1) + (needed_bonds[predicted_char] - 1)
+                        current_needed = (current_needed - 1) + (needed_bonds.get(predicted_char, 0) - 1)
                 
                 generated_molecule.append(predicted_char)
                 current_input = torch.tensor([[predicted_idx]])
                 current_char = predicted_char
                 
-            if generated_molecule[-1] == '=':
+            if generated_molecule[-1] == '=' and use_filter:
                 generated_molecule.pop()
             
             result_text = "".join(generated_molecule)
             st.success("✨ 분자 생성 완료!")
             st.markdown(f"### 🧬 AI가 예측한 구조: `{result_text}`")
-            draw_molecule_with_hydrogen(generated_molecule)
+            
+            # 필터가 켜져 있고 정상 분자일 때만 그림을 그림 (필터 꺼서 헛소리할 때는 텍스트만 출력)
+            is_valid_chem = all(c in ['C', 'O', 'N', '='] for c in generated_molecule)
+            if use_filter and is_valid_chem:
+                draw_molecule_with_hydrogen(generated_molecule)
+            else:
+                st.warning("⚠️ 필터가 꺼져 있거나 비정상적인 화학 구조이므로 시각화 렌더링을 생략합니다. (AI 날것의 문자열 출력)")
