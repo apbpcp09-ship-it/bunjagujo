@@ -89,4 +89,138 @@ def draw_molecule_with_hydrogen(molecule_list):
     ax.axis('off')
     st.pyplot(fig)
 
-#
+# --- 1모드: 다중 분자 훈련시키기 ---
+if mode == "🏋️ 다중 분자 훈련시키기":
+    st.subheader("🏋️ 여러 개의 분자 구조 동시에 학습시키기")
+    st.write("가르치고 싶은 여러 패턴을 쉼표(,)로 구분해서 입력하세요. AI가 한 바구니에 담아 골고루 배웁니다.")
+    
+    # 💡 콤마로 여러 개를 입력할 수 있게 가이드 변경
+    train_input = st.text_input("정답 분자 데이터셋 입력 (쉼표로 구분):", "C=C, O=C=O, CNN, CON")
+    epochs = st.slider("반복 훈련 횟수 (Epochs)", min_value=10, max_value=100, value=50, step=10)
+    
+    if st.button("🔥 멀티 데이터셋 딥러닝 시작"):
+        # 쉼표 기준 데이터 파싱
+        molecule_examples = [s.strip() for s in train_input.split(",") if s.strip()]
+        
+        if not molecule_examples:
+            st.error("⚠️ 올바른 분자식을 입력해 주세요.")
+            st.stop()
+            
+        model.train()
+        loss_fn = nn.CrossEntropyLoss()
+        
+        total_loss = 0
+        # 에폭 루프
+        for epoch in range(epochs):
+            epoch_loss = 0
+            # 💡 핵심: 입력된 모든 분자를 에폭마다 교대로 학습시켜 뇌의 균형을 맞춤
+            for example in molecule_examples:
+                try:
+                    tokens = [c for c in example] + ['<eos>']
+                    indices = [char_to_idx[t] for t in tokens]
+                except KeyError:
+                    continue # 잘못된 토큰은 스킵
+                    
+                optimizer.zero_grad()
+                x_data = torch.tensor([indices[:-1]]).long()
+                y_data = torch.tensor([indices[1:]]).long()
+                
+                output, _ = model(x_data)
+                loss = loss_fn(output.view(-1, 6), y_data.view(-1))
+                loss.backward()
+                optimizer.step()
+                
+                epoch_loss += loss.item()
+            
+            avg_epoch_loss = epoch_loss / len(molecule_examples)
+            st.session_state.loss_history.append(avg_epoch_loss)
+            
+        st.success(f"🎉 멀티 학습 완료! AI가 총 {len(molecule_examples)}개의 분자 유형 패턴을 골고루 흡수했습니다.")
+        
+        fig, ax = plt.subplots(figsize=(5, 2))
+        ax.plot(st.session_state.loss_history[-epochs:], color='blue', label='Batch Loss')
+        ax.set_title("멀티 데이터셋 훈련 오차 감소 현황")
+        ax.set_xlabel("Epochs")
+        ax.set_ylabel("Loss")
+        ax.legend()
+        st.pyplot(fig)
+
+# --- 2모드: 훈련된 AI로 분자 생성 ---
+elif mode == "🚀 훈련된 AI로 분자 생성":
+    st.subheader("🚀 균형 잡힌 AI의 분자 생성 확인")
+    st.write("여러 분자를 동시에 배운 AI는 시작 원소와 창의성(Temperature)에 따라 다양한 정답 패턴을 유기적으로 뱉어냅니다.")
+    
+    start_element = st.selectbox("시작할 원소를 선택하세요:", ['C', 'O', 'N'])
+    
+    if st.button("🚀 훈련된 AI 기반 분자 생성", use_container_width=True):
+        model.eval()
+        with torch.no_grad():
+            current_char = start_element
+            generated_molecule = [current_char]
+            current_input = torch.tensor([[char_to_idx[current_char]]])
+            hidden = None
+            
+            needed_bonds = {'C': 4, 'O': 2, 'N': 3}
+            current_needed = needed_bonds[start_element]
+            last_was_bond = False
+            
+            for step in range(5):
+                output, hidden = model(current_input, hidden)
+                logits = output.squeeze(0).squeeze(0)
+                
+                scaled_logits = logits / temperature
+                probs = F.softmax(scaled_logits, dim=-1)
+                sorted_indices = torch.argsort(probs, descending=True)
+                
+                predicted_char = None
+                predicted_idx = None
+                
+                if current_needed <= 0:
+                    predicted_char = '<eos>'
+                    break
+                    
+                for idx in sorted_indices:
+                    char = idx_to_char[idx.item()]
+                    if char == '<pad>': continue
+                    if char == '<eos>':
+                        if current_needed == 0 or step >= 2:
+                            predicted_char = char
+                            predicted_idx = idx.item()
+                            break
+                        continue
+                    if char == '=':
+                        if not last_was_bond and current_needed >= 2:
+                            predicted_char = char
+                            predicted_idx = idx.item()
+                            break
+                        continue
+                    if char in ['C', 'O', 'N']:
+                        if current_needed > 0:
+                            predicted_char = char
+                            predicted_idx = idx.item()
+                            break
+                
+                if not predicted_char or predicted_char == '<eos>':
+                    break
+                    
+                if predicted_char == '=':
+                    last_was_bond = True
+                else:
+                    if last_was_bond:
+                        current_needed = (current_needed - 2) + (needed_bonds[predicted_char] - 2)
+                        last_was_bond = False
+                    else:
+                        current_needed = (current_needed - 1) + (needed_bonds[predicted_char] - 1)
+                
+                generated_molecule.append(predicted_char)
+                current_input = torch.tensor([[predicted_idx]])
+                current_char = predicted_char
+                
+            if generated_molecule[-1] == '=':
+                generated_molecule.pop()
+            
+            result_text = "".join(generated_molecule)
+            st.success("✨ 분자 생성 완료!")
+            st.markdown(f"### 🧬 AI가 예측한 구조: `{result_text}`")
+            
+            draw_molecule_with_hydrogen(generated_molecule)
