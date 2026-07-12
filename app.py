@@ -5,9 +5,9 @@ import torch.nn.functional as F
 import torch.optim as optim
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="무조건 시각화 AI 시뮬레이터", layout="centered")
-st.title("🧠 AI 날것의 뇌 & 무조건 시각화 시뮬레이터")
-st.write("UI 구조를 개선하여 입력창이 항상 노출됩니다. AI 창의성 수치에 따른 극단적인 변화를 자유롭게 관찰하세요!")
+st.set_page_config(page_title="창의성 0 모드 AI 시뮬레이터", layout="centered")
+st.title("🧠 AI 날것의 뇌 & 창의성 0.0 시뮬레이터")
+st.write("AI 창의성 수치를 0.0까지 낮출 수 있습니다. 확률 0%의 완벽한 결정론적 AI 모드를 체감해 보세요!")
 
 # ----------------- 1. 사전 정의 및 AI 모델 설정 -----------------
 VOCAB = ['<pad>', 'C', 'O', 'N', '=', '<eos>']
@@ -38,20 +38,20 @@ model = st.session_state.model
 optimizer = st.session_state.optimizer
 
 
-# ----------------- 2. 사이드바 제어 및 설정 (상시 노출) -----------------
+# ----------------- 2. 사이드바 제어 및 설정 (0.0 설정 가능) -----------------
 st.sidebar.header("🕹️ 모드 선택 및 설정")
 mode = st.sidebar.radio("원하는 작업을 선택하세요:", ["🏋️ 다중 분자 훈련시키기", "🚀 훈련된 AI로 분자 생성"])
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎛️ AI 하이퍼파라미터")
-temperature = st.sidebar.slider("🔥 AI 창의성 (Temperature)", min_value=0.1, max_value=1.5, value=0.7, step=0.1)
+
+# 💡 최하 수치를 0.0으로 변경!
+temperature = st.sidebar.slider("🔥 AI 창의성 (Temperature)", min_value=0.0, max_value=1.5, value=0.7, step=0.1)
 use_filter = st.sidebar.checkbox("🛡️ 과학적 안전 필터(옥텟 규칙) 작동", value=True)
 
 
-# ----------------- 3. 메인 화면 UI 요소 배치 (상시 노출로 변경) -----------------
+# ----------------- 3. 메인 화면 UI 요소 배치 -----------------
 st.subheader("📝 AI 조작 패널")
-
-# 모드와 상관없이 메인 화면 상단에 항상 상시 노출되는 입력창 세트
 train_input = st.text_input("정답 분자 데이터셋 입력 (쉼표로 구분):", "C=C, O=C=O, CNN, CON, C=O, N=N, C=N, N=C=N, C=C=O, O=N, O=C=N")
 epochs = st.slider("반복 훈련 횟수 (Epochs)", min_value=10, max_value=100, value=50, step=10)
 start_element = st.selectbox("생성 시작할 원소 선택:", ['C', 'O', 'N'])
@@ -171,10 +171,14 @@ elif mode == "🚀 훈련된 AI로 분자 생성":
                 output, hidden = model(current_input, hidden)
                 logits = output.squeeze(0).squeeze(0)
                 
-                scaled_logits = logits / temperature
-                probs = F.softmax(scaled_logits, dim=-1)
-                
-                sampled_indices = torch.multinomial(probs, num_samples=10, replacement=True)
+                # 💡 핵심: 창의성이 0.0일 때는 무조건 최고 높은 값(Argmax)만 추적하게 분기 처리!
+                if temperature == 0.0:
+                    # 주사위를 아예 던지지 않고 1순위 인덱스 딱 하나만 낚아챔
+                    sampled_indices = torch.tensor([torch.argmax(logits).item()])
+                else:
+                    scaled_logits = logits / temperature
+                    probs = F.softmax(scaled_logits, dim=-1)
+                    sampled_indices = torch.multinomial(probs, num_samples=10, replacement=True)
                 
                 predicted_char = None
                 predicted_idx = None
@@ -183,7 +187,7 @@ elif mode == "🚀 훈련된 AI로 분자 생성":
                     predicted_char = '<eos>'
                     break
                 
-                if use_filter:
+                if use_filter and temperature > 0.0:
                     for idx in sampled_indices:
                         char = idx_to_char[idx.item()]
                         if char == '<pad>': continue
@@ -205,6 +209,7 @@ elif mode == "🚀 훈련된 AI로 분자 생성":
                                 predicted_idx = idx.item()
                                 break
                 else:
+                    # 필터가 꺼졌거나, 창의성이 0.0인 앵무새 모드일 때는 1순위 바로 선택
                     first_sample = sampled_indices[0].item()
                     predicted_char = idx_to_char[first_sample]
                     predicted_idx = first_sample
@@ -232,5 +237,4 @@ elif mode == "🚀 훈련된 AI로 분자 생성":
             st.success("✨ 분자 생성 완료!")
             st.markdown(f"### 🧬 AI가 예측한 구조: `{result_text}`")
             
-            # 필터 켜짐/꺼짐 상관없이 무조건 시각화 출력!
             draw_raw_molecule(generated_molecule, use_filter)
