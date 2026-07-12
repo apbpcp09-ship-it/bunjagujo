@@ -6,9 +6,9 @@ import torch.optim as optim
 import random
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="다중 데이터 AI 시뮬레이터", layout="centered")
-st.title("🧠 다중 데이터 실시간 AI 트레이닝 시뮬레이터")
-st.write("여러 분자 구조를 동시에 입력받아 AI가 파국적 망각 없이 다양한 패턴을 골고루 학습합니다.")
+st.set_page_config(page_title="확률적 샘플링 AI 시뮬레이터", layout="centered")
+st.title("🧠 진짜 작동하는 AI 창의성 분자 시뮬레이터")
+st.write("Argmax 방식의 고정 출력을 버리고, 확률적 샘플링(Multinomial)을 주입해 슬라이더 수치에 따라 완벽히 다변화됩니다.")
 
 VOCAB = ['<pad>', 'C', 'O', 'N', '=', '<eos>']
 char_to_idx = {char: idx for idx, char in enumerate(VOCAB)}
@@ -31,7 +31,7 @@ class MolecularLSTM(nn.Module):
 
 if 'model' not in st.session_state:
     st.session_state.model = MolecularLSTM()
-    st.session_state.optimizer = optim.Adam(st.session_state.model.parameters(), lr=0.05) # 안정적인 학습을 위해 lr 소폭 하향
+    st.session_state.optimizer = optim.Adam(st.session_state.model.parameters(), lr=0.05)
     st.session_state.loss_history = []
 
 model = st.session_state.model
@@ -59,6 +59,41 @@ def draw_molecule_with_hydrogen(molecule_list):
     atom_positions = {}
     atom_idx = 0
 
+    for idx, elem in enumerate(molecule_list):
+        if elem == '=':
+            ax.plot([x - 0.3, x + 0.3], [y + 0.06, y + 0.06], color='#444444', linewidth=3)
+            ax.plot([x - 0.3, x + 0.3], [y - 0.06, y - 0.06], color='#444444', linewidth=3)
+            x += 0.5
+        else:
+            if idx > 0 and molecule_list[idx-1] != '=':
+                ax.plot([x - 0.7, x - 0.3], [y, y], color='#888888', linewidth=2)
+            ax.text(x, y, elem, fontsize=22, fontweight='bold', color=colors.get(elem, '#000000'), ha='center', va='center', bbox=dict(facecolor='white', edgecolor='none', boxstyle='round,pad=0.1'))
+            atom_positions[atom_idx] = (x, y, elem, used_bonds[idx])
+            atom_idx += 1
+            x += 1.2
+
+    for idx, (ax_x, ax_y, elem, u_bond) in atom_positions.items():
+        needed_h = MAX_VALENCE[elem] - u_bond
+        if needed_h <= 0: continue
+        h_directions = []
+        if idx == 0: h_directions.append((-0.4, 0))
+        if idx == len(atom_positions) - 1: h_directions.append((0.4, 0))
+        h_directions.extend([(0, 0.45), (0, -0.45)])
+        for h_idx in range(min(needed_h, len(h_directions))):
+            dx, dy = h_directions[h_idx]
+            ax.plot([ax_x, ax_x + dx*0.6], [ax_y, ax_y + dy*0.6], color='#888888', linewidth=1.5)
+            ax.text(ax_x + dx, ax_y + dy, 'H', fontsize=14, fontweight='bold', color=colors['H'], ha='center', va='center')
+
+    ax.set_xlim(-0.2, x - 0.6)
+    ax.set_ylim(-0.8, 0.8)
+    ax.axis('off')
+    st.pyplot(fig)
+
+# --- 1모드: 다중 분자 훈련시키기 ---
+if mode == "🏋️ 다중 분자 훈련시키기":
+    st.subheader("🏋️ 여러 개의 분자 구조 동시에 학습시키기")
+    train_input = st.text_input("정답 분자 데이터셋 입력 (쉼표로 구분):", "C=C, O=C=O, CNN, CON, C=O, N=N, C=N, N=C=N, C=C=O, O=N, O=C=N")
+    epochs = st.slider("반복 훈련 횟수 (Epochs)", min_value=10, max_
     for idx, elem in enumerate(molecule_list):
         if elem == '=':
             ax.plot([x - 0.3, x + 0.3], [y + 0.06, y + 0.06], color='#444444', linewidth=3)
