@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="AI 분자구조 예측 시뮬레이터", layout="centered")
 st.title("🧠 AI를 통해 분자구조 예측하기 시뮬레이터")
-st.write("상단의 탭을 이용해 훈련 창과 생성 창을 오갈 수 있습니다.")
+st.write("상단의 탭을 이용해 훈련 공간과 생성 공간을 오갈 수 있습니다.")
 
 # ----------------- 1. 사전 정의 및 AI 모델 설정 -----------------
 VOCAB = ['<pad>', 'C', 'O', 'N', '=', '<eos>']
@@ -100,7 +100,7 @@ def draw_raw_molecule(molecule_list, has_filter):
 
 
 # ----------------- 4. 탭 분리 레이아웃 생성 -----------------
-tab_train, tab_generate = st.tabs(["🏋️ 다중 분자 학습", "🚀 AI 분자 생성"])
+tab_train, tab_generate = st.tabs(["🏋️ 분자 학습시키기", "🚀 AI 분자구조 예측하기"])
 
 # --- [탭 1] 다중 분자 훈련창 ---
 with tab_train:
